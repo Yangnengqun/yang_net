@@ -1,0 +1,1 @@
+datasets_path = "/home/wawa/mydatasets/cityscapes"
