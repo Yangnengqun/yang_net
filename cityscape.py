@@ -56,20 +56,20 @@ class CityscapesDataSet(data.Dataset):
         label = cv2.imread(datafiles["label"], cv2.IMREAD_GRAYSCALE)
         size = image.shape
         name = datafiles["name"]
-        if self.scale:   # 改变水平和垂直比例因子
-            f_scale = 0.5 + random.randint(0, 15) / 10.0  #random resize between 0.5 and 2  比例因子
-            image = cv2.resize(image, None, fx=f_scale, fy=f_scale, interpolation = cv2.INTER_LINEAR)
-            label = cv2.resize(label, None, fx=f_scale, fy=f_scale, interpolation = cv2.INTER_NEAREST)
+        # if self.scale:   # 改变水平和垂直比例因子
+        #     f_scale = 0.5 + random.randint(0, 15) / 10.0  #random resize between 0.5 and 2  比例因子
+        #     image = cv2.resize(image, None, fx=f_scale, fy=f_scale, interpolation = cv2.INTER_LINEAR)
+        #     label = cv2.resize(label, None, fx=f_scale, fy=f_scale, interpolation = cv2.INTER_NEAREST)
 
         image = np.asarray(image, np.float32)
         
         image = image[:, :, ::-1]  # 普通的图片是RGB，通过image = image[:, :, ::-1]转换成BGR
-        image -= self.mean
+        # image -= self.mean
         img_h, img_w = label.shape
         pad_h = max(self.crop_h - img_h, 0)
         pad_w = max(self.crop_w - img_w, 0)
-        if pad_h > 0 or pad_w > 0:
-            img_pad = cv2.copyMakeBorder(image, 0, pad_h, 0, 
+        if pad_h > 0 or pad_w > 0:               # 如果图像小了，则在图像加边框
+            img_pad = cv2.copyMakeBorder(image, 0, pad_h, 0,    
                 pad_w, cv2.BORDER_CONSTANT, 
                 value=(0.0, 0.0, 0.0))
             label_pad = cv2.copyMakeBorder(label, 0, pad_h, 0, 
@@ -88,10 +88,10 @@ class CityscapesDataSet(data.Dataset):
         
         image = image.transpose((2, 0, 1)) # HWC -> CHW
         
-        if self.is_mirror:
-            flip = np.random.choice(2) * 2 - 1
-            image = image[:, :, ::flip]
-            label = label[:, ::flip]
+        # if self.is_mirror:
+        #     flip = np.random.choice(2) * 2 - 1
+        #     image = image[:, :, ::flip]
+        #     label = label[:, ::flip]
 
 
         return image.copy(), label.copy(), np.array(size), name
