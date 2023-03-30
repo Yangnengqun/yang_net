@@ -10,6 +10,7 @@ import cv2
 from torch.utils import data
 import pickle
 from PIL import Image
+from torchvision import transforms
 # 当前地址
 # now_path = osp.dirname(__file__)
 # print(now_path)
@@ -19,14 +20,16 @@ from PIL import Image
 
 class CityscapesDataSet(data.Dataset):
     def __init__(self, root= '/home/wawa/yang_net/datasets/cityscapes', list_path = '/home/wawa/yang_net/datasets/cityscapes/cityscapes_train_list.txt', max_iters=None, 
-                 crop_size=(512, 1024), mean=(128, 128, 128), scale=True, mirror=True, ignore_label=255 ):
+                 crop_size=(512, 1024),scale=True, ignore_label=255 ):
+        self.transform = transforms.Compose(
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485,0.456,0.406], std=[0.229,0.224,0.225])
+        )
         self.root = root
         self.list_path = list_path
         self.crop_h, self.crop_w = crop_size
         self.scale = scale
         self.ignore_label = ignore_label
-        self.mean = mean
-        self.is_mirror = mirror
         self.img_ids = [i_id.strip() for i_id in open(list_path)]    # i_id.strip()删除字符串字符串头尾的指定的字符（默认）空格
         if not max_iters==None:
             self.img_ids = self.img_ids * int(np.ceil(float(max_iters) / len(self.img_ids)))  # max_iters最大训练次数 np.ceil(ndarray) 计算大于等于该值的最小整数
