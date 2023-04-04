@@ -27,7 +27,7 @@ class SegmentationMetric(object):
     def classPixelAccuracy(self):
         # return each category pixel accuracy(A more accurate way to call it precision)
         # acc = (TP) / TP + FP
-        classAcc = torch.diag(self.confusionMatrix) / self.confusionMatrix.sum(axis=1)
+        classAcc = torch.diag(self.confusionMatrix) / self.confusionMatrix.sum(dim = 1)
         return classAcc  # 返回的是一个列表值，如：[0.90, 0.80, 0.96]，表示类别1 2 3各类别的预测准确率
 
     def meanPixelAccuracy(self):
@@ -67,7 +67,7 @@ class SegmentationMetric(object):
         label = self.numClass * imgLabel[mask] + imgPredict[mask]
         count = torch.bincount(label, minlength=self.numClass ** 2)
         confusionMatrix = count.view(self.numClass, self.numClass)
-        # print(confusionMatrix)
+        print(confusionMatrix)
         return confusionMatrix
 
     def Frequency_Weighted_Intersection_over_Union(self):
@@ -76,7 +76,7 @@ class SegmentationMetric(object):
         FWIOU =     [(TP+FN)/(TP+FP+TN+FN)] *[TP / (TP + FP + FN)]
         """
         freq = torch.sum(self.confusion_matrix, axis=1) / torch.sum(self.confusion_matrix)
-        iu = np.diag(self.confusion_matrix) / (
+        iu = torch.diag(self.confusion_matrix) / (
                 torch.sum(self.confusion_matrix, axis=1) + torch.sum(self.confusion_matrix, axis=0) -
                 torch.diag(self.confusion_matrix))
         FWIoU = (freq[freq > 0] * iu[freq > 0]).sum()
@@ -104,7 +104,6 @@ class SegmentationMetric(object):
 #     mpa = metric.meanPixelAccuracy()
 #     IoU = metric.IntersectionOverUnion()
 #     mIoU = metric.meanIntersectionOverUnion()
-    
     
     
     

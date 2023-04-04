@@ -15,24 +15,24 @@ class CrossEntropyLoss2d(nn.Module):
     def forward(self, outputs, targets):
         return self.loss(F.log_softmax(outputs, dim=1), targets)  
 
-loss_func = nn.CrossEntropyLoss()
+# loss_func = nn.CrossEntropyLoss()
 
-input = torch.randn((1, 3, 5, 5), requires_grad=True)
-print(input)
-target = torch.tensor([[[0,1,2,2,2],
-                       [0,1,2,1,2],
-                       [0,1,1,2,2],
-                       [0,1,2,1,2],
-                       [0,1,2,1,2]
-                       ]])
-print(target)
-print(target.shape)
-output = loss_func(input, target)
-print(output)
+# input = torch.randn((1, 3, 5, 5), requires_grad=True)
+# print(input)
+# target = torch.tensor([[[0,1,2,2,2],
+#                        [0,1,2,1,2],
+#                        [0,1,1,2,2],
+#                        [0,1,2,1,2],
+#                        [0,1,2,1,2]
+#                        ]])
+# print(target)
+# print(target.shape)
+# output = loss_func(input, target)
+# print(output)
 
-loss1 = CrossEntropyLoss2d()
-output1 = loss1(input, target)
-print(output1)
+# loss1 = CrossEntropyLoss2d()
+# output1 = loss1(input, target)
+# print(output1)
 '''
  输入给模型的数据维度应该是 4 维的,(batch_size, C, H, W),语义分割标签维度应该是 3 维的:(batch_size, H, W)
 模型预测输出的通道数应该等于语义分割的类别数；
