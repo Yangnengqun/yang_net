@@ -10,16 +10,16 @@ class CrossEntropyLoss2d(nn.Module):
     def __init__(self, weight=None):
         super(CrossEntropyLoss2d,self).__init__()
 
-        self.loss = nn.NLLLoss(weight)
+        self.loss = nn.NLLLoss(weight,ignore_index=255)
 
     def forward(self, outputs, targets):
         return self.loss(F.log_softmax(outputs, dim=1), targets)  
 
-# loss_func = nn.CrossEntropyLoss()
+# loss_func = CrossEntropyLoss2d()
 
-# input = torch.randn((1, 3, 5, 5), requires_grad=True)
-# print(input)
-# target = torch.tensor([[[0,1,2,2,2],
+# input = torch.randn((1, 6, 5, 5), requires_grad=True)
+# print(input.size())
+# target = torch.tensor([[[255,1,2,2,2],
 #                        [0,1,2,1,2],
 #                        [0,1,1,2,2],
 #                        [0,1,2,1,2],

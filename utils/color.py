@@ -28,10 +28,10 @@ def color_mask(mask,n):
 # img = cam_mask(image,palette,10)
 # img.save('/home/wawa/yang_net/color_image/test.jpg')
 
-# image = cv2.imread("/home/wawa/yang_net/datasets/cityscapes/gtFine/train/aachen/aachen_000000_000019_gtFine_labelTrainIds.png",cv2.IMREAD_GRAYSCALE)
-# print(image.shape)
-# img = color_mask(image,19)
-# img.save('/home/wawa/yang_net/color_image/test1.jpg')
+image = cv2.imread("/home/wawa/yang_net/datasets/cityscapes/gtFine/train/aachen/aachen_000000_000019_gtFine_labelTrainIds.png",cv2.IMREAD_GRAYSCALE)
+print(image.shape)
+img = color_mask(image,19)
+img.save('/home/wawa/yang_net/color_image/test2.jpg')
 
 # if __name__ =="__main__" :
 #     pass
