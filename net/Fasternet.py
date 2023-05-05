@@ -6,8 +6,22 @@ from typing import List
 from torch import Tensor
 import copy
 import os
+import torch.nn.functional as F
+from torch.nn.functional import interpolate as interpolate
 
+class Conv2dBnRelu(nn.Module):
+    def __init__(self,in_ch,out_ch,kernel_size=3,stride=1,padding=0,dilation=1,bias=True):
+        super(Conv2dBnRelu,self).__init__()
+		
+        self.conv = nn.Sequential(
+		nn.Conv2d(in_ch,out_ch,kernel_size,stride,padding,dilation=dilation,bias=bias),
+		nn.BatchNorm2d(out_ch, eps=1e-3),
+		nn.ReLU(inplace=True)
+	)
 
+    def forward(self, x):
+        return self.conv(x)
+    
 # Pconv 
 class Partial_conv3(nn.Module):
 
@@ -66,6 +80,12 @@ class MLPBlock(nn.Module):
         self.n_div = n_div
 
         mlp_hidden_dim = int(dim * mlp_ratio)
+        
+        self.spatial_mixing = Partial_conv3(
+            dim,
+            n_div,
+            pconv_fw_type
+        )
 
         mlp_layer: List[nn.Module] = [
             nn.Conv2d(dim, mlp_hidden_dim, 1, bias=False),
@@ -75,12 +95,6 @@ class MLPBlock(nn.Module):
         ]
 
         self.mlp = nn.Sequential(*mlp_layer)
-
-        self.spatial_mixing = Partial_conv3(
-            dim,
-            n_div,
-            pconv_fw_type
-        )
 
 
     def forward(self, x: Tensor) -> Tensor:
@@ -131,13 +145,17 @@ class PatchEmbed(nn.Module):
     def __init__(self, patch_size, patch_stride, in_chans, embed_dim, norm_layer):
         super().__init__()
         self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_stride, bias=False)
+        #添加一个maxpoll层
+        # self.maxpool = nn.MaxPool2d(kernel_size=2,stride=2)
         if norm_layer is not None:
             self.norm = norm_layer(embed_dim)
         else:
             self.norm = nn.Identity()
 
-    def forward(self, x: Tensor) -> Tensor:
-        x = self.norm(self.proj(x))
+    def forward(self, x):
+        x = self.proj(x)
+        # x2 = self.maxpool(x)
+        # x = self.norm(torch.cat((x1,x2),dim=1))
         return x
 
 # 2×2下采样
@@ -156,17 +174,19 @@ class PatchMerging(nn.Module):
         return x
 
 
-class FasterNet(nn.Module):
+
+
+class Encoder(nn.Module):
 
     def __init__(self,
                  in_chans=3,  # 输入通道数
-                 num_classes=19,  # 类别数
+                 num_classes=20,  # 类别数
                  embed_dim=40,    # embedding的输出维度
-                 depths=(1, 2, 8, 2),  # 每个stage的MLP数量
+                 depths=(1, 2, 8),  # 每个stage的MLP数量
                  mlp_ratio=2.,         # MLP中PwCONV（1×1）通道的扩大倍数
                  n_div=4,    # PCONV取通道数的1/ndiv
-                 patch_size=4, # 输入层的卷积核
-                 patch_stride=4, # 输入层的步长
+                 patch_size=2, # 输入层的卷积核
+                 patch_stride=2, # 输入层的步长
                  patch_size2=2,  # for subsequent layers
                  patch_stride2=2,  # 下采样层
                  patch_norm=True,
@@ -211,119 +231,188 @@ class FasterNet(nn.Module):
                for x in torch.linspace(0, drop_path_rate, sum(depths))]
 
         # build layers
-        stages_list = []
-        for i_stage in range(self.num_stages):
-            stage = BasicStage(dim=int(embed_dim * 2 ** i_stage),
+        self.stage0= BasicStage(dim=int(embed_dim * 2 ** 0),
                                n_div=n_div,
-                               depth=depths[i_stage],
+                               depth=depths[0],
                                mlp_ratio=self.mlp_ratio,
-                               drop_path=dpr[sum(depths[:i_stage]):sum(depths[:i_stage + 1])],
+                               drop_path=dpr[sum(depths[:0]):sum(depths[:0 + 1])],
                                norm_layer=norm_layer,
                                act_layer=act_layer,
                                pconv_fw_type=pconv_fw_type
                                )
-            stages_list.append(stage)
-
-            # patch merging layer
-            if i_stage < self.num_stages - 1:
-                stages_list.append(
-                    PatchMerging(patch_size2=patch_size2,
+        self.merge0 = PatchMerging(patch_size2=patch_size2,
                                  patch_stride2=patch_stride2,
-                                 dim=int(embed_dim * 2 ** i_stage),
+                                 dim=int(embed_dim * 2 ** 0),
                                  norm_layer=norm_layer)
-                )
+        
+        self.stage1 = BasicStage(dim=int(embed_dim * 2 ** 1),
+                               n_div=n_div,
+                               depth=depths[1],
+                               mlp_ratio=self.mlp_ratio,
+                               drop_path=dpr[sum(depths[:1]):sum(depths[:1 + 1])],
+                               norm_layer=norm_layer,
+                               act_layer=act_layer,
+                               pconv_fw_type=pconv_fw_type
+                               )
+        self.merge1 = PatchMerging(patch_size2=patch_size2,
+                                 patch_stride2=patch_stride2,
+                                 dim=int(embed_dim * 2 ** 1),
+                                 norm_layer=norm_layer)
+        
+        self.stage2 = BasicStage(dim=int(embed_dim * 2 ** 2),
+                               n_div=n_div,
+                               depth=depths[2],
+                               mlp_ratio=self.mlp_ratio,
+                               drop_path=dpr[sum(depths[:2]):sum(depths[:2 + 1])],
+                               norm_layer=norm_layer,
+                               act_layer=act_layer,
+                               pconv_fw_type=pconv_fw_type
+                               )
+        # self.merge2 = PatchMerging(patch_size2=patch_size2,
+        #                          patch_stride2=patch_stride2,
+        #                          dim=int(embed_dim * 2 ** 2),
+        #                          norm_layer=norm_layer)
+        # self.stage3 = BasicStage(dim=int(embed_dim * 2 ** 3),
+        #                        n_div=n_div,
+        #                        depth=depths[3],
+        #                        mlp_ratio=self.mlp_ratio,
+        #                        drop_path=dpr[sum(depths[:3]):sum(depths[:3 + 1])],
+        #                        norm_layer=norm_layer,
+        #                        act_layer=act_layer,
+        #                        pconv_fw_type=pconv_fw_type
+        #                        )
+        self.output_conv = nn.Conv2d(160, num_classes, 1, stride=1, padding=0, bias=True)
+        
 
-        self.stages = nn.Sequential(*stages_list)
-    def forward(self, x):
+        
+        
+    def forward(self, x, predict=False):
     # output only the features of last layer for image classification
+        _,_,h,w = x.size()
         x = self.patch_embed(x)
-        x = self.stages(x)
+        x0 = self.stage0(x)
+        x1 = self.merge0(x0)
+        x1 = self.stage1(x1)
+        x2 = self.merge1(x1)
+        output = self.stage2(x2)
+        # out = self.merge2(x1)
+        # out = self.stage3(out)
+        if predict:
+            output = self.output_conv(output)
 
+
+        
+        
+        return output
+
+class Interpolate(nn.Module):
+    def __init__(self,size,mode):
+        super(Interpolate,self).__init__()
+        
+        self.interp = nn.functional.interpolate
+        self.size = size
+        self.mode = mode
+    def forward(self,x):
+        x = self.interp(x,size=self.size,mode=self.mode,align_corners=True)
         return x
+        
+
+class APN_Module(nn.Module):
+    def __init__(self, in_ch, out_ch):
+        super(APN_Module, self).__init__()
+        # global pooling branch
+        self.branch1 = nn.Sequential(
+                nn.AdaptiveAvgPool2d(1),
+                Conv2dBnRelu(in_ch, out_ch, kernel_size=1, stride=1, padding=0)
+	)
+        # midddle branch
+        self.mid = nn.Sequential(
+		Conv2dBnRelu(in_ch, out_ch, kernel_size=1, stride=1, padding=0)
+	)
+        self.down1 = Conv2dBnRelu(in_ch, 1, kernel_size=7, stride=2, padding=3)
+		
+        self.down2 = Conv2dBnRelu(1, 1, kernel_size=5, stride=2, padding=2)
+		
+        self.down3 = nn.Sequential(
+		Conv2dBnRelu(1, 1, kernel_size=3, stride=2, padding=1),
+		Conv2dBnRelu(1, 1, kernel_size=3, stride=1, padding=1)
+	)
+		
+        self.conv2 = Conv2dBnRelu(1, 1, kernel_size=5, stride=1, padding=2)
+        self.conv1 = Conv2dBnRelu(1, 1, kernel_size=7, stride=1, padding=3)
+	
+    def forward(self, x):
+        
+        h = x.size()[2]
+        w = x.size()[3]
+        
+        b1 = self.branch1(x)
+        # b1 = Interpolate(size=(h, w), mode="bilinear")(b1)
+        b1= interpolate(b1, size=(h, w), mode="bilinear", align_corners=True)
+	
+        mid = self.mid(x)
+		
+        x1 = self.down1(x)
+        x2 = self.down2(x1)
+        x3 = self.down3(x2)
+        # x3 = Interpolate(size=(h // 4, w // 4), mode="bilinear")(x3)
+        x3= interpolate(x3, size=(h // 4, w // 4), mode="bilinear", align_corners=True)	
+        x2 = self.conv2(x2)
+        x = x2 + x3
+        # x = Interpolate(size=(h // 2, w // 2), mode="bilinear")(x)
+        x= interpolate(x, size=(h // 2, w // 2), mode="bilinear", align_corners=True)
+       		
+        x1 = self.conv1(x1)
+        x = x + x1
+        # x = Interpolate(size=(h, w), mode="bilinear")(x)
+        x= interpolate(x, size=(h, w), mode="bilinear", align_corners=True)
+        		
+        x = torch.mul(x, mid)
+
+        x = x + b1
+       
+       
+        return x
+    
+class Decoder (nn.Module):
+    def __init__(self, num_classes):
+        super().__init__()
+
+        self.apn = APN_Module(in_ch=160,out_ch=20)
+        # self.upsample = Interpolate(size=(512, 1024), mode="bilinear")
+        # self.output_conv = nn.ConvTranspose2d(16, num_classes, kernel_size=4, stride=2, padding=1, output_padding=0, bias=True)
+        # self.output_conv = nn.ConvTranspose2d(16, num_classes, kernel_size=3, stride=2, padding=1, output_padding=1, bias=True)
+        # self.output_conv = nn.ConvTranspose2d(16, num_classes, kernel_size=2, stride=2, padding=0, output_padding=0, bias=True)
+  
+    def forward(self, input):
+        
+        output = self.apn(input)
+        out = interpolate(output, size=(512, 1024), mode="bilinear", align_corners=True)
+        # out = self.upsample(output)
+        # print(out.shape)
+        return out
+        
+        
+class Net(nn.Module):
+    def __init__(self, num_classes=20, encoder=None):  
+        super().__init__()
+
+        if (encoder == None):
+            self.encoder = Encoder()
+        else:
+            self.encoder = encoder
+        self.decoder = Decoder(num_classes)
+
+    def forward(self, input, only_encode=False):
+        if only_encode:
+            return self.encoder.forward(input, predict=True)
+        else:
+            output = self.encoder(input)    
+            return self.decoder.forward(output)
+
 
 if __name__ == "__main__":
-    input = torch.randn(4,3,1024,1024)
-    model = FasterNet()
-    y = model(input)
-    print(y.shape)
-
-    # def cls_init_weights(self, m):
-    #     if isinstance(m, nn.Linear):
-    #         trunc_normal_(m.weight, std=.02)
-    #         if isinstance(m, nn.Linear) and m.bias is not None:
-    #             nn.init.constant_(m.bias, 0)
-    #     elif isinstance(m, (nn.Conv1d, nn.Conv2d)):
-    #         trunc_normal_(m.weight, std=.02)
-    #         if m.bias is not None:
-    #             nn.init.constant_(m.bias, 0)
-    #     elif isinstance(m, (nn.LayerNorm, nn.GroupNorm)):
-    #         nn.init.constant_(m.bias, 0)
-    #         nn.init.constant_(m.weight, 1.0)
-
-    # init for mmdetection by loading imagenet pre-trained weights
-    # def init_weights(self, pretrained=None):
-    #     logger = get_root_logger()
-    #     if self.init_cfg is None and pretrained is None:
-    #         logger.warn(f'No pre-trained weights for '
-    #                     f'{self.__class__.__name__}, '
-    #                     f'training start from scratch')
-    #         pass
-    #     else:
-    #         assert 'checkpoint' in self.init_cfg, f'Only support ' \
-    #                                               f'specify `Pretrained` in ' \
-    #                                               f'`init_cfg` in ' \
-    #                                               f'{self.__class__.__name__} '
-    #         if self.init_cfg is not None:
-    #             ckpt_path = self.init_cfg['checkpoint']
-    #         elif pretrained is not None:
-    #             ckpt_path = pretrained
-
-    #         ckpt = _load_checkpoint(
-    #             ckpt_path, logger=logger, map_location='cpu')
-    #         if 'state_dict' in ckpt:
-    #             _state_dict = ckpt['state_dict']
-    #         elif 'model' in ckpt:
-    #             _state_dict = ckpt['model']
-    #         else:
-    #             _state_dict = ckpt
-
-    #         state_dict = _state_dict
-    #         missing_keys, unexpected_keys = \
-    #             self.load_state_dict(state_dict, False)
-
-    #         # show for debug
-    #         print('missing_keys: ', missing_keys)
-    #         print('unexpected_keys: ', unexpected_keys)
-
-# def forward_cls(self, x):
-#     # output only the features of last layer for image classification
-#     x = self.patch_embed(x)
-#     x = self.stages(x)
-#     x = self.avgpool_pre_head(x)  # B C 1 1
-#     x = torch.flatten(x, 1)
-#     x = self.head(x)
-
-#     return x
-
-    # def forward_det(self, x: Tensor) -> Tensor:
-    #     # output the features of four stages for dense prediction
-    #     x = self.patch_embed(x)
-    #     outs = []
-    #     for idx, stage in enumerate(self.stages):
-    #         x = stage(x)
-    #         if self.fork_feat and idx in self.out_indices:
-    #             norm_layer = getattr(self, f'norm{idx}')
-    #             x_out = norm_layer(x)
-    #             outs.append(x_out)
-
-    #     return outs
-
-#  if __name__ == "__main__":
-#      model = FasterNet(
-#         mlp_ratio=2.0,
-#         embed_dim=128,
-#         depths=(1, 2, 13, 2),
-#         drop_path_rate=0.15,
-#         act_layer='RELU',
-#         fork_feat=True,
-#         )
+    input = torch.randn(4,3,512,1024)
+    model = Net(20)
+    out = model(input)
+    print(out.shape)
