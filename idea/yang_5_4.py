@@ -149,11 +149,11 @@ class SS_nbt_module(nn.Module):
 
         out = self._concat(output1,output2)
         out = F.relu(out, inplace=True)
-        out = channel_shuffle(out,2)
         out = self.pconv(out)
         out = self.mlp(out)
         out = self.dropout(out)
         out = F.relu(residual + out, inplace=True)
+        out = channel_shuffle(out,2)
         return out
 
 class Encoder(nn.Module):

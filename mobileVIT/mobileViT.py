@@ -226,7 +226,7 @@ class MobileViTBlock(nn.Module):
         ffn_dim: int,         # MLP中全连接层的节点个数
         n_transformer_blocks: int = 2,  # 重复堆叠次数
         head_dim: int = 32,     # 每一个head所对应的维度
-        attn_dropout: float = 0.0,
+        attn_dropout: float = 0.0,  # drop比列
         dropout: float = 0.0,
         ffn_dropout: float = 0.0,
         patch_h: int = 8,    # 将特征图划分成每一个pathch的宽高

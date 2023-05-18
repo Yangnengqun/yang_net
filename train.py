@@ -21,7 +21,7 @@ from torchvision.transforms import Compose, CenterCrop, Normalize, Resize, Pad
 from torchvision.transforms import ToTensor, ToPILImage
 # ------------------------------------------------------------------网络-------------------------------------------
 from net import Fasternet,lednet
-from idea import yang_5_4
+from idea import yang_5_4,yang_5_16
 
 from utils.dataset import VOC12,cityscapes
 from utils.transform import Relabel, ToLabel, Colorize
@@ -430,7 +430,7 @@ def main(args):
     #     myfile.write(str(args))
     # ----------------------------------------------加载模型，并放到GPU----------------------------------------------------------------
     # model = Fasternet.FasterNet()
-    model = yang_5_4.Net(num_classes=NUM_CLASSES)
+    model = yang_5_16.Net(num_classes=NUM_CLASSES)
     model = model.to(device)
     
     # 继续训练
@@ -465,7 +465,7 @@ def main(args):
     print("========== DECODER TRAINING ===========")
     if (not args.state):
         pretrainedEnc = next(model.children()).encoder
-        model = yang_5_4.Net(NUM_CLASSES, encoder=pretrainedEnc)  #Add decoder to encoder
+        model = yang_5_16.Net(NUM_CLASSES, encoder=pretrainedEnc)  #Add decoder to encoder
         if args.cuda:
             model = torch.nn.DataParallel(model).cuda()
         #When loading encoder reinitialize weights for decoder because they are set to 0 when training dec
@@ -480,20 +480,20 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     # parser.add_argument('--cuda', action='store_true', default="True")  #NOTE: cpu-only has not been tested so you might have to change code if you deactivate this flag
     
-    # parser.add_argument('--state')
-    parser.add_argument('--state',default="/home/wawa/yang_net/save/logs/model_encoder_best.pth")
+    parser.add_argument('--state')
+    # parser.add_argument('--state',default="/home/wawa/yang_net/save/logs/model_encoder_best.pth")
 
     parser.add_argument('--port', type=int, default=8097)
     parser.add_argument('--datadir', default="/home/wawa/yang_net/datasets/cityscapes")   # 数据集地址
-    parser.add_argument('--savedir', default="/home/wawa/yang_net/save/logs")             # 权重保存地址
+    parser.add_argument('--savedir', default="/home/wawa/yang_net/save/logs_5_17")             # 权重保存地址
     parser.add_argument('--height', type=int, default=512)     # 图片的H
-    parser.add_argument('--num-epochs', type=int, default=150)  # 训练轮数
+    parser.add_argument('--num-epochs', type=int, default=300)  # 训练轮数
     parser.add_argument('--num-workers', type=int, default=1)   # num_worker
-    parser.add_argument('--batch-size', type=int, default=3)    # dataloader的单次训练图片数
+    parser.add_argument('--batch-size', type=int, default=4)    # dataloader的单次训练图片数
     parser.add_argument('--steps-loss', type=int, default=50)    # 每50个step输出损失
     parser.add_argument('--steps-plot', type=int, default=50)    # 每50个step可视化一次
     parser.add_argument('--epochs-save', type=int, default=50)    #You can use this value to save model every X epochs
-    parser.add_argument('--decoder', action='store_true',default=True)      # 为空时，先训练encoder再训练decoder
+    parser.add_argument('--decoder', action='store_true',default=False)      # 为空时，先训练encoder再训练decoder
     
     parser.add_argument('--visualize', action='store_true',default=False)  # 可视化
     parser.add_argument('--visualize_loss', action='store_true',default=False)
