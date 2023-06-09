@@ -1,1 +1,1 @@
-Best epoch is 287, with Val-IoU= 0.6930
+Best epoch is 269, with Val-IoU= 0.6792

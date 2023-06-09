@@ -6,7 +6,7 @@ from torch.nn.functional import interpolate as interpolate
 from typing import List
 import math
 
-
+#-------------------------------------------- miou   67.92  logs_5_17    ---------------------------------
 def split(x):
     c = int(x.size()[1])
     c1 = round(c * 0.5)

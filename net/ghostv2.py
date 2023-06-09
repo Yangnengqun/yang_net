@@ -235,7 +235,7 @@ class GhostNetV2(nn.Module):
 @register_model
 def ghostnetv2(**kwargs):
     cfgs = [   
-        # k, t, c, SE, s 
+        # k,   t,  c,  SE, s 
         [[3,  16,  16, 0, 1]],
         [[3,  48,  24, 0, 2]],
         [[3,  72,  24, 0, 1]],
